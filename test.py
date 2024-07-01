@@ -14,12 +14,10 @@ base_path = os.path.dirname(os.path.abspath(__file__)) #本番 (__file__)
 # now_path = os.path.normpath(os.path.join(base_path, "test"))
 
 #エクセル取り込み
-questionnaire_contract = os.path.normpath(os.path.join(base_path, "契約_回答.xlsx"))
-questionnaire_claim = os.path.normpath(os.path.join(base_path, "損害_回答.xlsx"))
+questionnaire_file = os.path.normpath(os.path.join(base_path, "契約_回答.xlsx"))
 
 #エクセルDF化
-contract_file = pd.read_excel(questionnaire_contract, engine='openpyxl',index_col=0,header=2)
-claim_file = pd.read_excel(questionnaire_claim, engine='openpyxl',index_col=0,header=2)
+df = pd.read_excel(questionnaire_file, engine='openpyxl',index_col=0,header=2)
 
 #推奨度抽出
 def recommendData(file):
@@ -45,17 +43,12 @@ def recommendData(file):
     fillna_0 = recommend_df.fillna(0)
     return fillna_0
 
-claim_recommend = recommendData(claim_file)
-contract_recommend = recommendData(contract_file)
+recommend_mean = recommendData(df)
 
 # 今月のコメント
-# 契約＝推奨度の理由、フリーコメント
-# 損害＝推奨度の理由、フリーコメント
 def commentData(file):
     copy_df = file.copy()
     index_reset = copy_df.reset_index().set_index("送信日")
-
-    # def extractCommentData(data,agentNum):
     comment_column = index_reset.loc[:,["推奨度の理由","フリーコメント"]]
     # '\n\n' を削除
     comment_column = comment_column.apply(lambda x: x.str.replace('\n\n', ''))
@@ -67,36 +60,46 @@ def commentData(file):
     current_year = datetime.now().year
     comment_column = comment_column[comment_column.index.to_series().apply(lambda x: x.month == current_month and x.year == current_year)]
     return comment_column
-claim_month_comment = commentData(claim_file)
-contract_month_comment = commentData(contract_file)
+
+month_comment = commentData(df)
+# 過去のコメント
+def commentPastData(file):
+    copy_df = file.copy()
+    index_reset = copy_df.reset_index().set_index("送信日")
+    comment_column = index_reset.loc[:,["推奨度の理由","フリーコメント"]]
+    # '\n\n' を削除
+    comment_column = comment_column.apply(lambda x: x.str.replace('\n\n', ''))
+    comment_column = comment_column.apply(lambda x: x.str.replace('\n', ''))
+    comment_column = comment_column.dropna(subset=["推奨度の理由", "フリーコメント"], how='all')
+    comment_column = comment_column.fillna("-")
+    # 送信日が今月のものだけ抽出
+    # current_month = datetime.now().month
+    # current_year = datetime.now().year
+    # comment_column = comment_column[comment_column.index.to_series().apply(lambda x: x.year == current_year)]
+    # comment_column = comment_column[comment_column.index.to_series().apply(lambda x: x.month != current_month and x.year == current_year)]
+    return comment_column
+past_comment = commentPastData(df)
 
 #エクセル出力
 current_month = str(datetime.now().month)
 current_year = str(datetime.now().year)
-excel_new_path = os.path.normpath(os.path.join(base_path, current_year + "_" + current_month + '_アンケート集計.xlsx'))
-sheet_name = ["推奨度_契約","推奨度_損害","今月のコメント_契約","今月のコメント_損害"]
+excel_new_path = os.path.normpath(os.path.join(base_path, current_year + "_" + current_month + '_アンケート集計_.xlsx'))
+sheet_name = ["推奨度","今月のコメント","過去のコメント"]
 with pd.ExcelWriter(excel_new_path, engine='openpyxl') as writer:
-    contract_recommend.to_excel(writer, sheet_name=sheet_name[0])
+    recommend_mean.to_excel(writer, sheet_name=sheet_name[0])
 with pd.ExcelWriter(excel_new_path, mode='a', engine='openpyxl') as writer:
-    claim_recommend.to_excel(writer, sheet_name=sheet_name[1])
+    month_comment.to_excel(writer, sheet_name=sheet_name[1])
 with pd.ExcelWriter(excel_new_path, mode='a', engine='openpyxl') as writer:
-    contract_month_comment.to_excel(writer, sheet_name=sheet_name[2])
-with pd.ExcelWriter(excel_new_path, mode='a', engine='openpyxl') as writer:
-    claim_month_comment.to_excel(writer, sheet_name=sheet_name[3])
+    past_comment.to_excel(writer, sheet_name=sheet_name[2])
+# with pd.ExcelWriter(excel_new_path, mode='a', engine='openpyxl') as writer:
+#     claim_month_comment.to_excel(writer, sheet_name=sheet_name[3])
 
 #グラフシート作成
-data_name_list = ["グラフ_契約","グラフ_損害"]
-def add_gpaph_recommend(data,data_name):
+def add_gpaph_recommend(data):
     _df = data.iloc[:,[0,1]]
-    if data_name == data_name_list[0]:
-        list_number = 0
-    else:
-        list_number = 1
-    graph_name = ["推奨度_契約","推奨度_損害"]
-
     _df.plot(
         subplots=True,
-        title=graph_name[list_number],
+        title="推奨度_グラフ",
         grid=True,
         colormap='Set1',
         legend=True,
@@ -110,14 +113,12 @@ def add_gpaph_recommend(data,data_name):
     img = openpyxl.drawing.image.Image(image_file_path)
     plt.close('all')
     # エクセル出力
-
     wb = openpyxl.load_workbook(excel_new_path)
-    sh = wb.create_sheet(data_name)
+    sh = wb.create_sheet("推奨度_グラフ")
     sh.add_image(img, "B2")
     wb.save(excel_new_path)
     wb.close()
     # os.remove(base_path + "/tmp.png")
     os.remove(image_file_path)
 
-add_gpaph_recommend(contract_recommend,data_name_list[0])
-add_gpaph_recommend(claim_recommend,data_name_list[1])
+add_gpaph_recommend(recommend_mean)
