@@ -6,18 +6,19 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import japanize_matplotlib
 import openpyxl
-import warnings
+# import warnings
 from file_read import message_read_complete
 from file_read import questionnaire_xlsx_read
 from file_read import message_save_complete
-warnings.simplefilter("ignore")
+# warnings.simplefilter("ignore")
+plt.rcParams['font.family'] = "MS Gothic"
 
 base_path = os.path.dirname(os.path.abspath(__file__)) #本番 (__file__)
-# input_path = os.path.dirname(base_path)
+input_path = os.path.dirname(base_path)
 # now_path = os.path.normpath(os.path.join(base_path, "test"))
 current_month = str(datetime.now().month)
 current_year = str(datetime.now().year)
-excel_new_path = os.path.normpath(os.path.join(base_path, current_year + "_" + current_month + '_アンケート集計_【ファイル名】.xlsx'))
+excel_new_path = os.path.normpath(os.path.join(input_path, current_year + "_" + current_month + '_アンケート集計_【ファイル名】.xlsx'))
 
 def readFile():
     #エクセル取り込み
